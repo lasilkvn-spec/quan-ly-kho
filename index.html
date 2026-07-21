@@ -614,6 +614,23 @@ function splitAddr(a){
   const tinh=parts.pop()||'',huyen=parts.pop()||'',xa=parts.pop()||'',ct=parts.join(', ');
   return{tinh,huyen,xa,ct:ct||a||''};
 }
+// Mã KH tự sinh cho đơn Thái (W...) và Quốc tế (BT...) — tiếp nối đúng số đã dùng trước đó.
+const CUST_CODE_BASE={W:3417,BT:1227};
+function nextCustCode(prefix){
+  let max=CUST_CODE_BASE[prefix]||0;
+  allOrders.forEach(o=>{
+    if(o.customer_code&&o.customer_code.startsWith(prefix)){
+      const n=parseInt(o.customer_code.slice(prefix.length))||0;
+      if(n>max)max=n;
+    }
+  });
+  return prefix+(max+1);
+}
+function custCodePrefixFor(channel){
+  if(channel==='Thái'||channel==='KOL Thái')return 'W';
+  if(channel==='Quốc tế')return 'BT';
+  return '';
+}
 const TAY_KIND_MAP={
   grab_khach:{channel:'Online',status:'Đã gửi',ship_method:'Grab',immediate:true,label:'Đơn Grab · Khách'},
   grab_kol:  {channel:'KOL VN',status:'Đã gửi',ship_method:'Grab',immediate:true,label:'Đơn Grab · KOL'},
@@ -635,6 +652,8 @@ async function saveOrderTay(kind){
   if(!lines.length){toast('Chọn ít nhất 1 sản phẩm',true);return;}
   if(cfg.immediate&&!confirmShortfall(lines.map(l=>({product_code:l.code,quantity:l.qty})),cfg.label))return;
   const code=newCode(); const isKol=KOL_CH.includes(cfg.channel);
+  const custPrefix=custCodePrefixFor(cfg.channel);
+  const customer_code=custPrefix?nextCustCode(custPrefix):'';
   showLoad(true);
   try{
     let li=0;
@@ -643,7 +662,7 @@ async function saveOrderTay(kind){
       const rows=await POST('orders',{order_code:code,date:todayStr(),customer_name:name,phone,address:addr,
         product_code:l.code,product_name:pname(p),quantity:l.qty,channel:cfg.channel,status:cfg.status,
         tracking_code:'',staff:'',note:note||cfg.label,amount_due:l.qty*l.price,is_paid:false,shipping_fee:0,
-        payment_method:pay,ship_method:cfg.ship_method});
+        payment_method:pay,ship_method:cfg.ship_method,customer_code});
       if(rows&&rows[0])allOrders.unshift(rows[0]);
       if(cfg.immediate){
         await postXuat({product_code:l.code,quantity:l.qty,channel:cfg.channel,ref_type:'order',
@@ -831,6 +850,7 @@ function orderCard(g,actions,emphTime){
   const items=g.map(r=>`${escapeHtml(r.product_name)} × <b>${r.quantity}</b>`).join(' · ');
   const isKol=KOL_CH.includes(o.channel);
   const avail=g.every(r=>stockOne(r.product_code)>=r.quantity);
+  const isThaiIntl=['Thái','KOL Thái','Quốc tế'].includes(o.channel);
   let btns='';
   if(actions){
     if(o.status==='Chờ chốt'){
@@ -854,6 +874,7 @@ function orderCard(g,actions,emphTime){
             <span class="warnbadge" style="background:var(--org-bg);color:var(--org-fg)">chờ hàng về · chưa cộng kho</span>`;
     }
   }
+  if(isThaiIntl)btns=(btns?btns:'')+`<button class="btn btn-sm" style="background:#222;color:#fff" onclick="printThaiLabel('${code}')">🖨 In tem</button>`;
   return `<div class="oc ${selected.has(code)?'sel':''}" id="oc-${code}">
     <div class="oc-hd">
       <div style="flex:1;min-width:200px">
@@ -2239,6 +2260,72 @@ async function addNewProduct(){
     setTimeout(()=>document.querySelector('.qr-card.is-new')?.scrollIntoView({behavior:'smooth',block:'center'}),400);
   }catch(e){toast('Lỗi: '+e.message,true);}
   showLoad(false);
+}
+/* ── In tem đơn Thái / Quốc tế (song ngữ, dán ngoài kiện hàng) ── */
+function thaiLabelTag(channel){
+  if(channel==='Thái'||channel==='KOL Thái')return 'ThaiLan';
+  if(channel==='Quốc tế')return 'QuocTe';
+  return '';
+}
+async function printThaiLabel(code){
+  const g=allOrders.filter(o=>o.order_code===code);
+  if(!g.length){toast('Không tìm thấy đơn '+code,true);return;}
+  const o=g[0];
+  // Đơn tạo trước khi có tính năng này sẽ chưa có Mã KH → tự sinh bù ngay khi in lần đầu
+  if(!o.customer_code){
+    const prefix=custCodePrefixFor(o.channel);
+    if(prefix){
+      const cc=nextCustCode(prefix);
+      showLoad(true);
+      try{
+        await PATCH(`orders?order_code=eq.${encodeURIComponent(code)}`,{customer_code:cc});
+        allOrders.forEach(x=>{if(x.order_code===code)x.customer_code=cc;});
+        o.customer_code=cc;
+      }catch(e){toast('Lỗi cập nhật Mã KH: '+e.message,true);}
+      showLoad(false);
+    }
+  }
+  const totalQty=g.reduce((s,r)=>s+(r.quantity||0),0);
+  const tag=thaiLabelTag(o.channel);
+  const itemsHtml=g.map(r=>`<div class="sp-item">${escapeHtml(r.product_name)} × ${r.quantity}</div>`).join('');
+  const w=window.open('','_blank','width=420,height=680');
+  w.document.write(`<!DOCTYPE html><html><head><title>Tem - ${code}</title><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;display:flex;flex-direction:column;align-items:center;padding:20px;gap:12px}
+    .label{width:100mm;padding:8mm;border:1px solid #ddd;border-radius:3mm;background:#fff;color:#111}
+    .brand{font-size:20px;font-weight:800;letter-spacing:.02em}
+    .sender{font-size:10.5px;color:#888;letter-spacing:.04em;margin-top:2px}
+    .custcode{font-size:13px;font-weight:800;margin-top:10px}
+    .qty-badge{position:absolute;top:8mm;right:8mm;background:#111;color:#fff;font-weight:800;font-size:12px;padding:4px 10px;border-radius:20px}
+    .rule{border:none;border-top:1.5px solid #111;margin:10px 0}
+    .rule-dash{border:none;border-top:1px dashed #ccc;margin:10px 0}
+    .lbl{font-size:10px;font-weight:700;color:#999;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
+    .big{font-size:16px;font-weight:800;line-height:1.35}
+    .phone{font-size:15px;font-weight:800;margin-top:4px}
+    .sp-item{background:#f2f2f2;border-radius:6px;padding:9px 11px;font-size:14px;font-weight:700;margin-top:6px}
+    .foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-size:11px;color:#888}
+    .print-btn{padding:8px 20px;background:#3E2723;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
+    @media print{.print-btn,.hint{display:none}body{background:#fff;padding:0;margin:0}@page{margin:5mm}.label{border:none;width:auto}}
+  </style></head><body>
+    <div class="label" style="position:relative">
+      <div class="qty-badge">× ${totalQty}</div>
+      <div class="brand">LÀSILK</div>
+      <div class="sender">VIETNAM · 0364000709</div>
+      ${o.customer_code?`<div class="custcode">MÃ KH: ${escapeHtml(o.customer_code)}</div>`:''}
+      <hr class="rule">
+      <div class="lbl">Người nhận</div>
+      <div class="big">Recipient: ${escapeHtml(o.customer_name||'')}</div>
+      <div class="phone">${escapeHtml(o.phone||'')}</div>
+      <div class="lbl" style="margin-top:12px">Địa chỉ</div>
+      <div class="big">${escapeHtml(o.address||'')}</div>
+      <hr class="rule-dash">
+      <div class="lbl">Sản phẩm</div>
+      ${itemsHtml}
+      <div class="foot"><span>${escapeHtml(code)} · ${fmtDate(o.date)}</span><span>${tag}</span></div>
+    </div>
+    <button class="print-btn hint" onclick="window.print()">🖨 In tem</button>
+  </body></html>`);
+  w.document.close();
 }
 function printOneQR(code,name,color,size){
   const tmp=document.createElement('div');
