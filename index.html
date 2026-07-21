@@ -471,6 +471,7 @@ async function sb(path,opts={}){const r=await fetch(`${SB_URL}/rest/v1/${path}`,
 const GET=p=>sb(p);
 const POST=(p,b)=>sb(p,{method:'POST',body:JSON.stringify(b)});
 const PATCH=(p,b)=>sb(p,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify(b)});
+const DEL=(p)=>sb(p,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
 // LƯU Ý: cố tình KHÔNG có hàm DELETE. Sửa/huỷ = ghi bút toán đảo.
 
 /* ══════════ STATE + UTILS ══════════ */
@@ -574,7 +575,7 @@ function confirmShortfall(items,action){
   const lines=sf.map(s=>`• ${s.name}: cần ${s.need}, còn ${s.have} (thiếu ${s.short})`).join('\n');
   return confirm(`⚠️ Không đủ hàng để ${action}:\n\n${lines}\n\nVẫn tiếp tục? Kho sẽ bị âm và được ghi nhận bán âm.`);
 }
-function renderAll(){renderToday();renderDiDon();renderDonTabs();renderDon();renderKol();renderKho();buildOProdSelect();renderOrderPage();renderLog();updateBadges();
+function renderAll(){renderToday();renderDiDon();renderDonTabs();renderDon();renderKol();renderKho();buildOProdSelect();renderOrderPage();renderLog();updateBadges();renderLines();
   if(document.getElementById('pg-qr')?.classList.contains('on'))renderQR(allProducts);
   if(document.getElementById('pg-products')?.classList.contains('on'))renderProductsTable();
 }
@@ -875,6 +876,7 @@ function orderCard(g,actions,emphTime){
     }
   }
   if(isThaiIntl)btns=(btns?btns:'')+`<button class="btn btn-sm" style="background:#222;color:#fff" onclick="printThaiLabel('${code}')">🖨 In tem</button>`;
+  btns=(btns?btns:'')+`<button class="btn btn-sm" style="background:var(--red-bg);color:var(--red-fg);border-color:#E7A5A4" onclick="deleteOrderAsk('${code}')">🗑 Xoá đơn</button>`;
   return `<div class="oc ${selected.has(code)?'sel':''}" id="oc-${code}">
     <div class="oc-hd">
       <div style="flex:1;min-width:200px">
@@ -897,6 +899,24 @@ function orderCard(g,actions,emphTime){
     </div>
     ${btns?`<div class="row" style="margin-top:10px">${btns}</div>`:''}
   </div>`;
+}
+async function deleteOrderAsk(code){
+  const g=allOrders.filter(o=>o.order_code===code);
+  if(!g.length){toast('Không tìm thấy đơn '+code,true);return;}
+  const touched=allTx.some(t=>t.ref_type==='order'&&String(t.ref_id||'').startsWith(code+'#'));
+  if(touched){
+    alert(`Đơn ${code} đã có phát sinh xuất/nhập kho — không xoá thẳng được để tránh sai lệch sổ kho.\n\nDùng nút "Huỷ / Hoàn / Đổi" ở đơn này để đảo kho đúng cách trước, sau đó mới xoá nếu cần.`);
+    return;
+  }
+  if(!confirm(`Xoá hẳn đơn ${code}?\n\nĐơn này chưa phát sinh xuất/nhập kho nên xoá an toàn. Sau khi xoá sẽ KHÔNG khôi phục lại được.`))return;
+  showLoad(true);
+  try{
+    await DEL(`orders?order_code=eq.${encodeURIComponent(code)}`);
+    allOrders=allOrders.filter(o=>o.order_code!==code);
+    toast(`✓ Đã xoá đơn ${code}`);
+    renderDonTabs();renderDon();renderToday();updateBadges();
+  }catch(e){toast('Lỗi xoá: '+e.message,true);}
+  showLoad(false);
 }
 async function chotOrder(code){
   showLoad(true);
@@ -1199,7 +1219,11 @@ function crossTable(prods,days,cellFn,from){
 
 /* ══════════ KHO ══════════ */
 let khoTab='ALL';let khoMode='kho';
-function groupByName(){const g={};allProducts.forEach(p=>{(g[p.name]=g[p.name]||[]).push(p);});return g;}
+function groupByName(){
+  const nm=normName();const g={};
+  allProducts.forEach(p=>{const key=nm[(p.name||'').trim().toLowerCase()]||(p.name||'');(g[key]=g[key]||[]).push(p);});
+  return g;
+}
 function soldIn(code,days){const f=daysAgo(days-1),t=todayStr();
   return allTx.filter(x=>x.product_code===code&&x.type==='Xuất'&&!isKK(x)&&!x.is_kol&&x.date>=f&&x.date<=t)
     .reduce((s,x)=>s+(x.quantity||0),0);}
