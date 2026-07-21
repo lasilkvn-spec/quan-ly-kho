@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -106,6 +107,23 @@ tr:last-child td{border-bottom:none}
 #sb-backdrop.on{display:block}
 @media(max-width:760px){.sb{position:fixed;left:0;z-index:100;transform:translateX(-100%);transition:.2s}.sb.open{transform:none}.main{padding:16px;padding-top:60px}.grid2{grid-template-columns:1fr}#menu-btn{display:flex}}
 
+/* ===== QR + DANH MỤC SẢN PHẨM ===== */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--brown);margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--dark);background:var(--card)}
+.field input:focus,.field select:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 3px rgba(247,193,205,.2)}
+.field3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+.qr-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;position:relative}
+.qr-delete{position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:50%;background:var(--red-bg);color:var(--red-fg);border:none;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}
+.qr-card:hover .qr-delete{opacity:1}
+.qr-card.is-new{border-color:#378ADD;box-shadow:0 0 0 3px var(--blue-bg)}
+.qr-box{width:120px;height:120px;margin:0 auto 10px;background:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.qr-code-label{font-size:10px;font-family:monospace;color:var(--brown);margin-bottom:3px}
+.qr-name{font-size:16px;font-weight:700;color:var(--dark);margin-bottom:3px;line-height:1.2}
+.qr-detail{font-size:14px;font-weight:600;color:var(--dark)}
+@media(max-width:600px){.qr-grid{grid-template-columns:repeat(2,1fr)}.field3{grid-template-columns:1fr}}
+
 /* ===== NHÂN VIÊN & LƯƠNG ===== */
 .s-card{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden}
 .s-hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)}
@@ -172,6 +190,10 @@ tr:last-child td{border-bottom:none}
       <div class="nav-i" data-pg="order"><span class="nav-ico">🛒</span><span class="nav-t">Order Hàng</span></div>
       <div class="nav-grp">Kiểm kê</div>
       <div class="nav-i" data-pg="log"><span class="nav-ico">🔍</span><span class="nav-t">Kiểm kê & Lịch sử</span></div>
+      <div class="nav-grp">Sản phẩm</div>
+      <div class="nav-i" data-pg="qr"><span class="nav-ico">🔳</span><span class="nav-t">QR Code sản phẩm</span></div>
+      <div class="nav-i" data-pg="products"><span class="nav-ico">🗂️</span><span class="nav-t">Danh mục sản phẩm</span></div>
+      <div class="nav-grp">Nhân sự</div>
       <div class="nav-i" data-pg="staff"><span class="nav-ico">👩‍💼</span><span class="nav-t">Nhân viên & Lương</span><span class="nav-b" id="b-staff" style="display:none">0</span></div>
     </div>
   </nav>
@@ -181,12 +203,36 @@ tr:last-child td{border-bottom:none}
     <section class="pg on" id="pg-tao">
       <div class="pg-t">✍️ Lên đơn</div>
       <div class="tabs">
-        <div class="tab on" id="taomode-tay" onclick="setTaoMode('tay')">✍️ Lên đơn tay</div>
-        <div class="tab" id="taomode-shopee" onclick="setTaoMode('shopee')">🛍️ Đơn Shopee (sàn)</div>
+        <div class="tab on" id="taomode-san" onclick="setTaoMode('san')">🛍️ Đơn Sàn</div>
+        <div class="tab" id="taomode-ngoai" onclick="setTaoMode('ngoai')">📮 Ngoại Sàn</div>
+        <div class="tab" id="taomode-tay" onclick="setTaoMode('tay')">✍️ Tạo Tay</div>
       </div>
 
-      <div id="tao-tay">
-        <div class="pg-s">Tạo đơn để quản lý. <b>Chưa trừ kho</b> — kho chỉ trừ khi bấm gửi ở trang Quản lý đơn.</div>
+      <!-- ĐƠN SÀN: Shopee + TikTok -->
+      <div id="tao-san">
+        <div class="pg-s">Đơn phát sinh <b>trực tiếp trên sàn Shopee / TikTok</b> — chỉ ghi nhận & <b>trừ kho ngay</b>, không tạo lại đơn thủ công. Chống trùng theo mã đơn.</div>
+        <div class="setup">📥 <b>Shopee:</b> Kênh Người Bán → Đơn hàng → Xuất file <code>.xlsx</code>. <b>Hoặc</b> kéo thả <b>tem PDF</b> (SPX hoặc TikTok Shop) vào ô dưới — tự nhận diện, đọc mã đơn / khách / sản phẩm / COD. Mẹo: đặt SKU phân loại trên sàn = mã SP trong danh mục để khớp chính xác 100%.</div>
+        <div class="card" style="max-width:680px">
+          <label class="fld" style="margin:0"><span>File đơn Shopee/TikTok (.xlsx / .csv / .pdf tem)</span><input type="file" id="sh-file" accept=".xlsx,.xls,.csv,.pdf" onchange="shopeeParse(this)"></label>
+          <div id="sh-summary" style="margin-top:12px"></div>
+        </div>
+        <div id="sh-preview" style="margin-top:16px"></div>
+      </div>
+
+      <!-- NGOẠI SÀN: GHN hoặc đơn vị vận chuyển ngoài (Khách / KOL / Đổi hàng) -->
+      <div id="tao-ngoai" style="display:none">
+        <div class="pg-s">Đơn đi qua đơn vị vận chuyển ngoài (GHN...) không thuộc sàn TMĐT. Tải tem lên rồi <b>chọn loại cho từng đơn</b> — Khách/KOL trừ kho ngay, Đổi hàng đưa vào hàng chờ về (chưa cộng kho).</div>
+        <div class="setup">📥 Tải <b>tem PDF (GHN Express)</b> kéo vào ô dưới — tự đọc tên khách, địa chỉ, SĐT, COD, sản phẩm.</div>
+        <div class="card" style="max-width:680px">
+          <label class="fld" style="margin:0"><span>File tem Ngoại sàn (.pdf)</span><input type="file" id="ng-file" accept=".pdf" onchange="ghnParse(this)"></label>
+          <div id="ng-summary" style="margin-top:12px"></div>
+        </div>
+        <div id="ng-preview" style="margin-top:16px"></div>
+      </div>
+
+      <!-- TẠO TAY -->
+      <div id="tao-tay" style="display:none">
+        <div class="pg-s">Tạo đơn thủ công. Chọn <b>loại đơn</b> ở cuối form — mỗi loại có luồng trừ kho khác nhau.</div>
         <div id="setup-note"></div>
         <div class="card" style="max-width:640px">
           <div style="border:1.5px dashed #B5D4F4;border-radius:10px;padding:12px;margin-bottom:14px;background:#F5FAFF">
@@ -200,39 +246,30 @@ tr:last-child td{border-bottom:none}
             <label class="fld"><span>Số điện thoại</span><input id="t-phone" placeholder="09..."></label>
           </div>
           <label class="fld"><span>Địa chỉ (đầy đủ, cách nhau bởi dấu phẩy: chi tiết, xã, huyện, tỉnh)</span><input id="t-addr" placeholder="123 Lê Lợi, P.Bến Nghé, Q.1, TP.HCM"></label>
-          <div class="grid2">
-            <label class="fld"><span>Kênh</span><select id="t-channel">
-              <option value="Online">Online (Zalo/TikTok)</option>
-              <option value="Ngoài sàn">Ngoài sàn</option>
-              <option value="Thái">Đơn Thái Lan</option>
-              <option value="Quốc tế">Đơn Quốc Tế</option>
-            </select></label>
-            <label class="fld"><span>Thanh toán</span><select id="t-pay">
-              <option>COD</option><option>Chuyển khoản</option>
-            </select></label>
-          </div>
+          <label class="fld"><span>Thanh toán</span><select id="t-pay"><option>COD</option><option>Chuyển khoản</option></select></label>
           <div style="font-size:11px;font-weight:600;color:var(--brown);margin:6px 0 6px">Sản phẩm</div>
           <div id="t-lines"></div>
           <button class="btn btn-sm" onclick="addLine()">+ Thêm dòng SP</button>
           <label class="fld" style="margin-top:12px"><span>Ghi chú</span><input id="t-note" placeholder="tuỳ chọn"></label>
-          <div class="row" style="margin-top:6px">
-            <button class="btn btn-honey" onclick="saveOrder('Chờ chốt')">💾 Lưu Chờ chốt</button>
-            <button class="btn btn-grn" onclick="saveOrder('Chờ gửi')">✅ Tạo đơn (sẵn sàng gửi)</button>
-            <button class="btn btn-pink" onclick="saveOrder('Nợ hàng')">⏳ Nợ hàng (chờ về)</button>
+          <div style="font-size:11px;font-weight:700;color:var(--brown);letter-spacing:.05em;text-transform:uppercase;margin:14px 0 8px">Chọn loại đơn</div>
+          <div class="row" style="margin-top:2px">
+            <button class="btn btn-blue" onclick="saveOrderTay('grab_khach')">🛵 Đơn Grab · Khách</button>
+            <button class="btn btn-pink" onclick="saveOrderTay('grab_kol')">🛵⭐ Đơn Grab · KOL</button>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn btn-honey" onclick="saveOrderTay('cho_chot')">💾 Chờ chốt</button>
+            <button class="btn" style="background:var(--org-bg);color:var(--org-fg);border-color:#E8C84A" onclick="saveOrderTay('no_hang')">⏳ Nợ đơn</button>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn btn-grn" onclick="saveOrderTay('thai_khach')">🇹🇭 Đơn Thái · Khách</button>
+            <button class="btn btn-pink" onclick="saveOrderTay('thai_kol')">🇹🇭⭐ Đơn Thái · KOL</button>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn btn-dark" onclick="saveOrderTay('quocte')">🌐 Đơn Quốc Tế</button>
           </div>
         </div>
         <div style="margin-top:20px" class="pg-s"><b>Đơn tạo hôm nay</b></div>
         <div id="t-today"></div>
-      </div>
-
-      <div id="tao-shopee" style="display:none">
-        <div class="pg-s">Đơn phát sinh <b>trực tiếp trên sàn Shopee</b> — chỉ ghi nhận <b>trừ kho</b>, không tạo lại đơn thủ công. Chống trùng theo mã đơn Shopee.</div>
-        <div class="setup">📥 <b>Lấy file:</b> Kênh Người Bán → <b>Đơn hàng</b> → nút <b>Xuất</b> → file <code>.xlsx</code>. <b>Hoặc</b> tải <b>tem giao hàng PDF</b> (SPX) rồi kéo vào ô dưới — tự đọc mã đơn, tên khách, sản phẩm, COD. Mẹo: đặt <b>SKU phân loại</b> trên Shopee = mã SP trong danh mục để khớp chính xác 100%.</div>
-        <div class="card" style="max-width:680px">
-          <label class="fld" style="margin:0"><span>File đơn Shopee (.xlsx / .csv / .pdf tem)</span><input type="file" id="sh-file" accept=".xlsx,.xls,.csv,.pdf" onchange="shopeeParse(this)"></label>
-          <div id="sh-summary" style="margin-top:12px"></div>
-        </div>
-        <div id="sh-preview" style="margin-top:16px"></div>
       </div>
     </section>
 
@@ -272,6 +309,7 @@ tr:last-child td{border-bottom:none}
         </div>
       </div>
       <div class="tabs" id="don-tabs"></div>
+      <div id="don-date-bar" style="margin-bottom:12px"></div>
       <div id="don-brk" style="margin-bottom:12px"></div>
       <div id="don-list"></div>
     </section>
@@ -344,6 +382,40 @@ tr:last-child td{border-bottom:none}
       <div class="tabs" id="log-tabs"></div>
       <div class="card" style="padding:0;overflow:auto"><table id="log-tbl"></table></div>
     </section>
+    <!-- QR CODE SẢN PHẨM -->
+    <section class="pg" id="pg-qr">
+      <div class="pg-t">🔳 QR Code Sản Phẩm</div>
+      <div class="pg-s">Tự động sinh · in ra dán vào tag hàng.</div>
+      <div class="row" style="margin-bottom:14px"><button class="btn btn-dark" onclick="window.print()">🖨 In tất cả QR</button></div>
+      <div class="card" style="max-width:680px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px">Thêm sản phẩm mới → QR tự sinh ngay</div>
+        <div class="field3">
+          <label class="fld" style="margin:0"><span>Tên sản phẩm *</span><input id="np-name" placeholder="VD: Đầm Butterfly"></label>
+          <label class="fld" style="margin:0"><span>Màu sắc *</span><input id="np-color" placeholder="VD: Đỏ rượu"></label>
+          <label class="fld" style="margin:0"><span>Size *</span><select id="np-size"><option>S</option><option>M</option><option>L</option><option>XL</option><option>Free size</option></select></label>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-top:6px">
+          <label class="fld" style="margin:0"><span>Tồn kho ban đầu</span><input id="np-stock" type="number" value="0" min="0"></label>
+          <label class="fld" style="margin:0"><span>Link ảnh (URL)</span><input id="np-image" placeholder="https://..."></label>
+          <button class="btn btn-dark" onclick="addNewProduct()">+ Thêm & sinh QR</button>
+        </div>
+      </div>
+      <div class="qr-grid" id="qr-grid"></div>
+    </section>
+
+    <!-- DANH MỤC SẢN PHẨM -->
+    <section class="pg" id="pg-products">
+      <div class="pg-t">🗂️ Danh Mục Sản Phẩm</div>
+      <div class="pg-s">Quản lý toàn bộ sản phẩm trong hệ thống.</div>
+      <div class="row" style="margin-bottom:12px"><button class="btn btn-dark" onclick="openAddProduct()">+ Thêm sản phẩm</button></div>
+      <div class="card" style="padding:0;overflow:auto">
+        <table>
+          <thead><tr><th class="l">Ảnh</th><th class="l">Mã SP</th><th class="l">Tên sản phẩm</th><th class="l">Màu</th><th class="l">Ảnh URL</th><th class="l">Tạo lúc</th><th>Thao tác</th></tr></thead>
+          <tbody id="products-body"></tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="pg" id="pg-staff">
       <div class="pg-t">👩‍💼 Nhân viên & Lương</div>
       <div style="font-size:12px;color:var(--brown);margin-bottom:14px">Quản lý phép năm · tính lương · lịch sử · lưu trên máy này (localStorage)</div>
@@ -502,7 +574,10 @@ function confirmShortfall(items,action){
   const lines=sf.map(s=>`• ${s.name}: cần ${s.need}, còn ${s.have} (thiếu ${s.short})`).join('\n');
   return confirm(`⚠️ Không đủ hàng để ${action}:\n\n${lines}\n\nVẫn tiếp tục? Kho sẽ bị âm và được ghi nhận bán âm.`);
 }
-function renderAll(){renderToday();renderDiDon();renderDonTabs();renderDon();renderKol();renderKho();buildOProdSelect();renderOrderPage();renderLog();updateBadges();}
+function renderAll(){renderToday();renderDiDon();renderDonTabs();renderDon();renderKol();renderKho();buildOProdSelect();renderOrderPage();renderLog();updateBadges();
+  if(document.getElementById('pg-qr')?.classList.contains('on'))renderQR(allProducts);
+  if(document.getElementById('pg-products')?.classList.contains('on'))renderProductsTable();
+}
 
 /* ══════════ NAV ══════════ */
 function toggleSidebar(force){
@@ -515,6 +590,8 @@ document.querySelectorAll('.nav-i').forEach(n=>n.onclick=()=>{
   document.querySelectorAll('.pg').forEach(x=>x.classList.remove('on'));
   n.classList.add('on');document.getElementById('pg-'+n.dataset.pg).classList.add('on');
   if(n.dataset.pg==='staff'){staffTab('leave');}
+  if(n.dataset.pg==='qr'){renderQR(allProducts);}
+  if(n.dataset.pg==='products'){renderProductsTable();}
   toggleSidebar(false); // mobile: đóng menu sau khi chọn trang
 });
 
@@ -537,31 +614,45 @@ function splitAddr(a){
   const tinh=parts.pop()||'',huyen=parts.pop()||'',xa=parts.pop()||'',ct=parts.join(', ');
   return{tinh,huyen,xa,ct:ct||a||''};
 }
-async function saveOrder(status){
+const TAY_KIND_MAP={
+  grab_khach:{channel:'Online',status:'Đã gửi',ship_method:'Grab',immediate:true,label:'Đơn Grab · Khách'},
+  grab_kol:  {channel:'KOL VN',status:'Đã gửi',ship_method:'Grab',immediate:true,label:'Đơn Grab · KOL'},
+  cho_chot:  {channel:'Online',status:'Chờ chốt',ship_method:'',immediate:false,label:'Chờ chốt'},
+  no_hang:   {channel:'Online',status:'Nợ hàng',ship_method:'',immediate:false,label:'Nợ đơn'},
+  thai_khach:{channel:'Thái',status:'Chờ gửi',ship_method:'',immediate:false,label:'Đơn Thái · Khách'},
+  thai_kol:  {channel:'KOL Thái',status:'Chờ gửi',ship_method:'',immediate:false,label:'Đơn Thái · KOL'},
+  quocte:    {channel:'Quốc tế',status:'Chờ gửi',ship_method:'',immediate:false,label:'Đơn Quốc Tế'},
+};
+async function saveOrderTay(kind){
+  const cfg=TAY_KIND_MAP[kind]; if(!cfg){toast('Loại đơn không hợp lệ',true);return;}
   const name=document.getElementById('t-name').value.trim();
   const phone=document.getElementById('t-phone').value.trim();
   const addr=document.getElementById('t-addr').value.trim();
-  const channel=document.getElementById('t-channel').value;
   const pay=document.getElementById('t-pay').value;
   const note=document.getElementById('t-note').value.trim();
   const lines=tLines.filter(l=>l.code&&l.qty>0).map(l=>({...l,qty:intv(l.qty,1),price:intv(l.price,0)}));
   if(!name){toast('Nhập tên khách',true);return;}
   if(!lines.length){toast('Chọn ít nhất 1 sản phẩm',true);return;}
-  const code=newCode();
+  if(cfg.immediate&&!confirmShortfall(lines.map(l=>({product_code:l.code,quantity:l.qty})),cfg.label))return;
+  const code=newCode(); const isKol=KOL_CH.includes(cfg.channel);
   showLoad(true);
   try{
-    const total=lines.reduce((s,l)=>s+l.qty*l.price,0);
+    let li=0;
     for(const l of lines){
       const p=allProducts.find(x=>x.code===l.code);
       const rows=await POST('orders',{order_code:code,date:todayStr(),customer_name:name,phone,address:addr,
-        product_code:l.code,product_name:pname(p),quantity:l.qty,channel,status,
-        tracking_code:'',staff:'',note,amount_due:l.qty*l.price,is_paid:false,shipping_fee:0,
-        payment_method:pay,ship_method:''});
+        product_code:l.code,product_name:pname(p),quantity:l.qty,channel:cfg.channel,status:cfg.status,
+        tracking_code:'',staff:'',note:note||cfg.label,amount_due:l.qty*l.price,is_paid:false,shipping_fee:0,
+        payment_method:pay,ship_method:cfg.ship_method});
       if(rows&&rows[0])allOrders.unshift(rows[0]);
+      if(cfg.immediate){
+        await postXuat({product_code:l.code,quantity:l.qty,channel:cfg.channel,ref_type:'order',
+          ref_id:code+'#'+(li++),is_kol:isKol,note:`${isKol?NO_REVENUE_NOTE+' ':''}${cfg.label} ${code}`});
+      }
     }
-    toast(`✓ Tạo đơn ${code} · ${status}`);
+    toast(`✓ Tạo đơn ${code} · ${cfg.label}${cfg.immediate?' · đã trừ kho':''}`);
     tLines=[];document.getElementById('t-name').value='';document.getElementById('t-phone').value='';document.getElementById('t-addr').value='';document.getElementById('t-note').value='';addLine();
-    renderToday();renderDonTabs();renderDon();updateBadges();renderKho();
+    renderToday();renderDonTabs();renderDon();updateBadges();renderKho();renderKol();
   }catch(e){toast('Lỗi: '+e.message,true);}
   showLoad(false);
 }
@@ -574,24 +665,24 @@ function renderToday(){
 
 /* ══════════ QUẢN LÝ ĐƠN ══════════ */
 const DON_FILTERS=[
+  {k:'Đơn đã tạo',f:o=>true},
   {k:'Chờ chốt',f:o=>o.status==='Chờ chốt'},
-  {k:'Cần gửi',f:o=>o.status==='Chờ gửi'},
   {k:'Nợ hàng',f:o=>o.status==='Nợ hàng'},
   {k:'Đã gửi',f:o=>['Đã gửi','Đã giao'].includes(o.status)},
-  {k:'Ngoài sàn',f:o=>o.channel==='Ngoài sàn'&&!['Đã hoàn','Đã đổi'].includes(o.status)},
   {k:'Thái',f:o=>o.channel==='Thái'&&!['Đã hoàn','Đã đổi'].includes(o.status)},
   {k:'Quốc tế',f:o=>o.channel==='Quốc tế'&&!['Đã hoàn','Đã đổi'].includes(o.status)},
   {k:'Grab',f:o=>o.ship_method==='Grab'},
-  {k:'Hoàn chờ về',f:o=>o.status==='Chờ hàng về'},
-  {k:'Đổi trả',f:o=>['Đã hoàn','Đã đổi'].includes(o.status)},
+  {k:'Đổi/trả',f:o=>o.status==='Chờ hàng về'||['Đã hoàn','Đã đổi'].includes(o.status)},
 ];
-let donFilter='Cần gửi';let donView='don';let donProd='ALL';
+const DON_DATE_TABS=['Đơn đã tạo','Đã gửi'];
+let donDatePreset='all';let donDateFrom='';let donDateTo='';
+let donFilter='Đơn đã tạo';let donView='don';let donProd='ALL';
 function groupOrders(list){
   const g={};list.forEach(o=>{(g[o.order_code]=g[o.order_code]||[]).push(o);});
   return Object.values(g).sort((a,b)=>new Date(b[0].created_at||b[0].date)-new Date(a[0].created_at||a[0].date));
 }
 let donBrkOpen=false;
-const PENDING_TABS=['Chờ chốt','Cần gửi','Nợ hàng'];
+const PENDING_TABS=['Đơn đã tạo','Chờ chốt','Nợ hàng'];
 function dotColor(c){
   const k=String(c||'').trim().toLowerCase();
   const M={'hồng':'#ED93B1','hong':'#ED93B1','vàng':'#EF9F27','vang':'#EF9F27','xanh':'#378ADD','xanh lá':'#97C459','xanh la':'#97C459','xanh dương':'#378ADD','xanh rêu':'#639922','nâu':'#8D6E63','nau':'#8D6E63','đen':'#3E2723','den':'#3E2723','trắng':'#EFE8D0','trang':'#EFE8D0','kem':'#F5E6C8','be':'#E8D9B5','bé':'#E8D9B5','đỏ':'#E24B4A','do':'#E24B4A','tím':'#7F77DD','tim':'#7F77DD','cam':'#EF9F27','xám':'#888780','xam':'#888780','bạc':'#B4B2A9'};
@@ -639,6 +730,34 @@ function renderDonBrk(list){
   box.innerHTML=head+`<div class="card" style="padding:0;border-radius:0 0 10px 10px;border-top:none;overflow:hidden">${body}
     ${showShort?'<div style="padding:7px 14px;font-size:11px;color:var(--brown);border-top:1px solid var(--border)">Ô đỏ = tồn kho không đủ cho số đơn đang chờ.</div>':''}</div>`;
 }
+function orderDateOf(o){return String(o.created_at||o.date||'').slice(0,10);}
+function donDateRange(){
+  if(donDatePreset==='today')return{from:todayStr(),to:todayStr()};
+  if(donDatePreset==='yesterday'){const y=daysAgo(1);return{from:y,to:y};}
+  if(donDatePreset==='custom')return{from:donDateFrom||'',to:donDateTo||''};
+  return null;
+}
+function donSetDatePreset(p){
+  donDatePreset=p;
+  if(p==='custom'&&!donDateFrom){donDateFrom=todayStr();donDateTo=todayStr();}
+  renderDonDateBar();renderDon();
+}
+function donSetCustomDate(which,val){
+  if(which==='from')donDateFrom=val;else donDateTo=val;
+  donDatePreset='custom';renderDon();
+}
+function renderDonDateBar(){
+  const box=document.getElementById('don-date-bar');if(!box)return;
+  if(!DON_DATE_TABS.includes(donFilter)){box.innerHTML='';return;}
+  const btn=(p,label)=>`<div class="tab${donDatePreset===p?' on':''}" onclick="donSetDatePreset('${p}')">${label}</div>`;
+  box.innerHTML=`<div class="tabs" style="margin-bottom:${donDatePreset==='custom'?'8px':'0'}">
+    ${btn('all','Tất cả ngày')}${btn('today','Hôm nay')}${btn('yesterday','Hôm qua')}${btn('custom','Tuỳ chỉnh')}
+  </div>
+  ${donDatePreset==='custom'?`<div class="row" style="align-items:center;gap:8px">
+    <label class="fld" style="margin:0"><span>Từ</span><input type="date" value="${donDateFrom}" onchange="donSetCustomDate('from',this.value)"></label>
+    <label class="fld" style="margin:0"><span>đến</span><input type="date" value="${donDateTo}" onchange="donSetCustomDate('to',this.value)"></label>
+  </div>`:''}`;
+}
 function renderDonTabs(){
   document.getElementById('don-tabs').innerHTML=DON_FILTERS.map(ff=>{
     const codes=new Set(allOrders.filter(ff.f).map(o=>o.order_code));
@@ -647,6 +766,7 @@ function renderDonTabs(){
 }
 function renderDon(){
   const ff=DON_FILTERS.find(x=>x.k===donFilter);
+  renderDonDateBar();
   const q=(document.getElementById('don-search')?.value||'').trim().toLowerCase();
   const sel=document.getElementById('don-prod');
   if(sel){const names=Object.keys(groupByName());
@@ -654,6 +774,10 @@ function renderDon(){
     if([...sel.options].some(o=>o.value===donProd))sel.value=donProd;else donProd='ALL';
   }
   let list=allOrders.filter(ff.f);
+  if(DON_DATE_TABS.includes(donFilter)){
+    const dr=donDateRange();
+    if(dr&&dr.from&&dr.to)list=list.filter(o=>{const d=orderDateOf(o);return d>=dr.from&&d<=dr.to;});
+  }
   if(q)list=list.filter(o=>[o.order_code,o.customer_name,o.phone,o.tracking_code].some(v=>String(v||'').toLowerCase().includes(q)));
   if(donProd!=='ALL'){
     const nameOf=o=>{const p=allProducts.find(x=>x.code===o.product_code);return p?p.name:(o.product_name||'');};
@@ -837,8 +961,8 @@ function openReturnArrived(code){
       <input type="checkbox" class="rt-chk" data-i="${i}" style="width:auto" checked>
       <span style="flex:1">${escapeHtml(r.product_name)} × ${r.quantity}</span></label>`).join('')}
     <label class="fld" style="margin-top:12px"><span>Hàng còn bán lại được không?</span>
-      <select id="rt-resell"><option value="1">Còn — nhập lại kho bán</option><option value="0">Không (hỏng) — không cộng vào kho bán</option></select></label>
-    <label class="fld"><span>Lý do</span><input id="rt-reason" value="${escapeHtml(prev)}"></label>`;
+      <select id="rt-resell-arr"><option value="1">Còn — nhập lại kho bán</option><option value="0">Không (hỏng) — không cộng vào kho bán</option></select></label>
+    <label class="fld"><span>Lý do</span><input id="rt-reason-arr" value="${escapeHtml(prev)}"></label>`;
   m_foot(`<button class="btn" onclick="closeModal()">Đóng</button>
     <button class="btn btn-grn" onclick="doReturnArrived('${code}')">✅ Đã về — cộng kho</button>`);
   openModal();
@@ -847,8 +971,8 @@ async function doReturnArrived(code){
   const rows=allOrders.filter(o=>o.order_code===code);
   const chks=[...document.querySelectorAll('.rt-chk')].filter(c=>c.checked).map(c=>rows[+c.dataset.i]);
   if(!chks.length){toast('Chọn ít nhất 1 món',true);return;}
-  const resell=document.getElementById('rt-resell').value==='1';
-  const reason=document.getElementById('rt-reason').value.trim()||'Hoàn/huỷ';
+  const resell=document.getElementById('rt-resell-arr').value==='1';
+  const reason=document.getElementById('rt-reason-arr').value.trim()||'Hoàn/huỷ';
   await processReturn(code,chks,resell,reason);
 }
 async function processReturn(code,chks,resell,reason){
@@ -1571,9 +1695,11 @@ function closeModal(){document.getElementById('modal').classList.remove('on');}
 /* ══════════ ĐƠN SHOPEE (SÀN) — chỉ trừ kho, chống trùng theo mã đơn ══════════ */
 function setTaoMode(m){
   document.getElementById('tao-tay').style.display=m==='tay'?'':'none';
-  document.getElementById('tao-shopee').style.display=m==='shopee'?'':'none';
+  document.getElementById('tao-san').style.display=m==='san'?'':'none';
+  document.getElementById('tao-ngoai').style.display=m==='ngoai'?'':'none';
   document.getElementById('taomode-tay').className='tab'+(m==='tay'?' on':'');
-  document.getElementById('taomode-shopee').className='tab'+(m==='shopee'?' on':'');
+  document.getElementById('taomode-san').className='tab'+(m==='san'?' on':'');
+  document.getElementById('taomode-ngoai').className='tab'+(m==='ngoai'?' on':'');
 }
 let shopeeLines=[];
 function shColIdx(header){
@@ -1686,6 +1812,46 @@ function shpParseProducts(full){
   }
   return out;
 }
+/* ── Đọc tem TikTok Shop (nhận diện trong cùng luồng Đơn Sàn) ── */
+function tkParsePage(rows,full){
+  if(!/Mã lấy hàng|Seller SKU|Order ID:/i.test(full))return null;
+  const order_code=(full.match(/Order ID:\s*(\d{8,})/)||[])[1]||(full.match(/Mã đơn hàng\s*:?\s*(\d{8,})/)||[])[1]||'';
+  if(!order_code)return null;
+  const buyer=((full.match(/Đến\s*:\s*([^\n(]+?)(?:\s*\(\+84\)|\n)/)||[])[1]||'').trim();
+  const phone=(full.match(/\(\+84\)[\d*]+/)||[])[0]||'';
+  let addr='';
+  const am=full.match(/Địa chỉ\s*:?\s*\n?([\s\S]*?)\n\s*Từ\s*:/);
+  if(am)addr=am[1].replace(/\s+/g,' ').trim();
+  const cod=parseInt(((full.match(/Thu tiền[^\d]*([\d.,]+)/)||[])[1]||'0').replace(/[^\d]/g,''))||0;
+  const express=/Ho[aả]\s*T[ốo]c/i.test(full);
+  const qtyTotal=parseInt((full.match(/Qty Total:\s*(\d+)/)||[])[1]||'1')||1;
+  // Cột SKU/Qty lệch hàng với tên SP nhiều dòng → tách theo toạ độ x của hàng tiêu đề
+  let prod='',variation='';
+  const hIdx=rows.findIndex(r=>{const t=r.items.map(it=>it.s).join(' ');return /Product\s*Name/i.test(t)&&/Qty/i.test(t);});
+  if(hIdx>=0){
+    const hItems=rows[hIdx].items;
+    const skuItem=hItems.find(it=>/^SKU$/i.test(String(it.s).trim()));
+    const qtyItem=[...hItems].reverse().find(it=>/^Qty$/i.test(String(it.s).trim()));
+    const skuX=skuItem?skuItem.x:null, qtyX=qtyItem?qtyItem.x:null;
+    const nameParts=[],skuParts=[];
+    for(let i=hIdx+1;i<rows.length;i++){
+      const rtxt=rows[i].items.map(it=>it.s).join(' ');
+      if(/Qty Total|Order ID/i.test(rtxt))break;
+      rows[i].items.forEach(it=>{
+        if(skuX!=null&&it.x>=skuX-8&&(qtyX==null||it.x<qtyX-8))skuParts.push(it.s);
+        else if(skuX==null||it.x<skuX-8)nameParts.push(it.s);
+      });
+    }
+    prod=nameParts.join(' ').replace(/\s+/g,' ').trim();
+    variation=skuParts.join(' ').replace(/\s+/g,' ').replace(/\s*,\s*/g,', ').trim();
+  }
+  if(!prod){
+    const bm=full.match(/Product Name[\s\S]*?Qty([\s\S]*?)Qty Total/i);
+    if(bm)prod=bm[1].replace(/\s+/g,' ').trim();
+  }
+  if(!prod)return null;
+  return{order_code,buyer,phone,addr,cod,express,prods:[{prod,variation,qty:qtyTotal}]};
+}
 async function shopeeParsePdf(file){
   const sum=document.getElementById('sh-summary');sum.innerHTML='<div class="setup">Đang đọc tem PDF…</div>';
   if(!window.pdfjsLib){sum.innerHTML='<div class="setup" style="background:var(--red-bg);color:var(--red-fg)">Chưa tải được pdf.js (cần mạng).</div>';return;}
@@ -1697,6 +1863,17 @@ async function shopeeParsePdf(file){
       const tc=await (await pdf.getPage(i)).getTextContent();
       const rows=shpPageRows(tc.items);
       const full=rows.map(r=>r.items.map(it=>it.s).join(' ')).join('\n');
+      const tk=tkParsePage(rows,full);
+      if(tk){
+        if(!tk.prods.length)continue;
+        tk.prods.forEach((pi,idx)=>{
+          const line={sn:tk.order_code,buyer:tk.buyer,express:tk.express,tracking:tk.order_code,prod:pi.prod,variation:pi.variation,
+            skuVar:'',skuProd:'',qty:pi.qty,date:'',price:idx===0?tk.cod:0,addr:tk.addr,phoneRaw:tk.phone};
+          line.code=shMatch(line);
+          shopeeLines.push(line);
+        });
+        continue;
+      }
       const order_code=(full.match(/Mã đơn hàng:\s*([A-Z0-9]{8,})/i)||[])[1]||'';
       if(!order_code)continue;
       const rcv=shpRecipient(rows);const buyer=rcv.name;
@@ -1713,7 +1890,7 @@ async function shopeeParsePdf(file){
         shopeeLines.push(line);
       });
     }
-    if(!shopeeLines.length){sum.innerHTML='<div class="setup" style="background:var(--red-bg);color:var(--red-fg)">Không đọc được đơn nào từ PDF. Kiểm tra đúng file tem SPX.</div>';return;}
+    if(!shopeeLines.length){sum.innerHTML='<div class="setup" style="background:var(--red-bg);color:var(--red-fg)">Không đọc được đơn nào từ PDF. Kiểm tra đúng file tem SPX/TikTok.</div>';return;}
     renderShopeePreview();
   }catch(err){sum.innerHTML='<div class="setup" style="background:var(--red-bg);color:var(--red-fg)">Lỗi đọc PDF: '+escapeHtml(err.message)+'</div>';}
 }
@@ -1840,7 +2017,314 @@ async function shopeeImport(){
   showLoad(false);
 }
 
+/* ══════════ NGOẠI SÀN (GHN) ══════════ */
+let ghnLines=[];
+function ghnOrderCode(full){
+  const re=/\b(?=[A-Z0-9]{6,10}\b)(?=[A-Z0-9]*[A-Z])(?=[A-Z0-9]*\d)[A-Z0-9]{6,10}\b/g;
+  let m;
+  while((m=re.exec(full))){
+    const tok=m[0];
+    if(/^\d{2}[:/]\d{2}/.test(tok))continue;
+    if(/^(VND|SPX|GHN|TIKTOK)/i.test(tok))continue;
+    return tok;
+  }
+  return '';
+}
+function ghnParsePage(full){
+  const order_code=ghnOrderCode(full);
+  if(!order_code)return null;
+  const rcvLine=(full.match(/Bên nhận\s*\n?([^\n]+)/)||[])[1]||'';
+  const phone=(rcvLine.match(/\*{2,6}\d{2,4}/)||[])[0]||'';
+  const tag=(rcvLine.match(/\(([^)]+)\)/)||[])[1]||'';
+  const name=rcvLine.replace(phone,'').replace(/\([^)]*\)/,'').trim();
+  let addr='';
+  const am=full.match(/Bên nhận[\s\S]*?\n[^\n]+\n([\s\S]*?)\n\s*Thu tiền người nhận/);
+  if(am)addr=am[1].replace(/\s+/g,' ').trim();
+  const cod=parseInt(((full.match(/Thu tiền người nhận\s*\n?\s*([\d.,]+)/)||[])[1]||'0').replace(/[^\d]/g,''))||0;
+  const items=[];
+  const pm=full.match(/SL tổng:\s*\d+\s*\n?([\s\S]*?)(?:\n\s*Ký tên|\n\s*Giao 1 phần|$)/i);
+  if(pm){
+    pm[1].split('\n').map(l=>l.trim()).filter(Boolean).forEach(line=>{
+      const m2=line.match(/^(.+?)\s*:\s*([A-Za-z0-9\/]{1,12})\s+(\d+)$/);
+      if(m2){items.push({prod:m2[1].trim(),variation:m2[2].trim(),qty:parseInt(m2[3])||1});return;}
+      const m3=line.match(/^(.+?)\s+(\d+)$/);
+      if(m3){items.push({prod:m3[1].trim(),variation:'',qty:parseInt(m3[2])||1});}
+    });
+  }
+  return{order_code,name,phone,addr,cod,tag,items};
+}
+async function ghnParse(input){
+  const file=input.files&&input.files[0]; if(!file)return;
+  const sum=document.getElementById('ng-summary');sum.innerHTML='<div class="setup">Đang đọc tem PDF…</div>';
+  if(!window.pdfjsLib){sum.innerHTML='<div class="setup" style="background:var(--red-bg);color:var(--red-fg)">Chưa tải được pdf.js (cần mạng).</div>';return;}
+  try{
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    ghnLines=[];
+    for(let i=1;i<=pdf.numPages;i++){
+      const tc=await (await pdf.getPage(i)).getTextContent();
+      const rows=shpPageRows(tc.items);
+      const full=rows.map(r=>r.items.map(it=>it.s).join(' ')).join('\n');
+      const g=ghnParsePage(full);
+      if(!g||!g.items.length)continue;
+      g.items.forEach((it,idx)=>{
+        const line={sn:g.order_code,buyer:g.name,phone:g.phone,addr:g.addr,tag:g.tag,
+          prod:it.prod,variation:it.variation,qty:it.qty,price:idx===0?g.cod:0,
+          kind:(g.tag&&/đổi/i.test(g.tag))?'doi':'khach'};
+        line.code=shMatch(line);
+        ghnLines.push(line);
+      });
+    }
+    if(!ghnLines.length){sum.innerHTML='<div class="setup" style="background:var(--red-bg);color:var(--red-fg)">Không đọc được đơn nào từ PDF. Kiểm tra đúng file tem GHN.</div>';return;}
+    renderGhnPreview();
+  }catch(e){sum.innerHTML='<div class="setup" style="background:var(--red-bg);color:var(--red-fg)">Lỗi đọc PDF: '+escapeHtml(e.message)+'</div>';}
+}
+function renderGhnPreview(){
+  const box=document.getElementById('ng-preview'),sum=document.getElementById('ng-summary');
+  const usedTrack=new Set(allOrders.map(o=>o.tracking_code||'').filter(Boolean));
+  const bySn={};ghnLines.forEach(l=>{(bySn[l.sn]=bySn[l.sn]||[]).push(l);});
+  const opts=sortPS(allProducts).map(p=>`<option value="${p.code}">${escapeHtml(pname(p))}</option>`).join('');
+  const codes=Object.keys(bySn);
+  sum.innerHTML=`<div class="setup" style="background:var(--grn-bg);color:var(--grn-fg);border-color:#97C459">Đọc được <b>${codes.length}</b> đơn (<b>${ghnLines.length}</b> dòng sản phẩm). Kiểm tra loại đơn cho từng mã rồi bấm xác nhận.</div>`;
+  box.innerHTML=`<div class="card" style="padding:0;overflow:auto"><table><thead><tr><th class="l">Mã đơn</th><th class="l">Khách</th><th class="l">Sản phẩm</th><th>SL</th><th class="l">Khớp kho</th><th class="l">Loại đơn</th></tr></thead><tbody>
+  ${codes.map(sn=>{
+    const already=usedTrack.has(sn);
+    return bySn[sn].map((l,li)=>{
+      const first=li===0; const gi=ghnLines.indexOf(l);
+      return `<tr style="${already?'opacity:.4':''}">
+        <td class="l mono" style="font-size:10.5px">${first?escapeHtml(sn):''}${first&&already?' <span class="pill" style="background:var(--bg)">đã nhập</span>':''}</td>
+        <td class="l" style="font-size:11px">${first?escapeHtml(l.buyer||'—')+(l.phone?'<br><span class="dim">'+escapeHtml(l.phone)+'</span>':''):''}</td>
+        <td class="l" style="font-size:11px">${escapeHtml(l.prod)}${l.variation?' <span class="dim">('+escapeHtml(l.variation)+')</span>':''}</td>
+        <td style="font-weight:700">${l.qty}</td>
+        <td class="l">${l.code?`<span class="pill" style="background:var(--grn-bg);color:var(--grn-fg)">${l.code}</span>`:`<select onchange="ghnLines[${gi}].code=this.value" style="font-size:11px;padding:4px 6px"><option value="">— chưa khớp —</option>${opts}</select>`}</td>
+        <td class="l">${first?`<select onchange="ghnSetKind('${sn}',this.value)" style="font-size:11px;padding:5px 8px">
+          <option value="khach" ${l.kind==='khach'?'selected':''}>👤 Khách</option>
+          <option value="kol" ${l.kind==='kol'?'selected':''}>⭐ KOL</option>
+          <option value="doi" ${l.kind==='doi'?'selected':''}>🔄 Đổi hàng</option>
+        </select>`:''}</td>
+      </tr>`;
+    }).join('');
+  }).join('')}
+  </tbody></table></div>
+  <div class="row" style="margin-top:14px"><button class="btn btn-dark" onclick="ghnConfirm()">✅ Xác nhận nhập ${codes.length} đơn</button></div>`;
+}
+function ghnSetKind(sn,kind){ghnLines.forEach(l=>{if(l.sn===sn)l.kind=kind;});}
+async function ghnConfirm(){
+  const bySn={};ghnLines.forEach(l=>{(bySn[l.sn]=bySn[l.sn]||[]).push(l);});
+  const usedTrack=new Set(allOrders.map(o=>o.tracking_code||'').filter(Boolean));
+  const codes=Object.keys(bySn).filter(sn=>!usedTrack.has(sn));
+  const missing=codes.filter(sn=>bySn[sn].some(l=>!l.code));
+  if(missing.length&&!confirm(`${missing.length} đơn có sản phẩm chưa khớp kho — dòng chưa khớp sẽ bị bỏ qua. Tiếp tục?`))return;
+  showLoad(true);let doneKhach=0,doneKol=0,doneDoi=0;
+  try{
+    for(const sn of codes){
+      const items=bySn[sn].filter(l=>l.code);
+      if(!items.length)continue;
+      const kind=items[0].kind;
+      const channel=kind==='kol'?'KOL VN':(kind==='doi'?'Đổi hàng':'Ngoại sàn');
+      const status=kind==='doi'?'Chờ hàng về':'Đã gửi';
+      let li=0;
+      for(const l of items){
+        const p=allProducts.find(x=>x.code===l.code);
+        const rows=await POST('orders',{order_code:sn,date:todayStr(),customer_name:l.buyer||'',phone:l.phone||'',address:l.addr||'',
+          product_code:l.code,product_name:p?pname(p):l.prod,quantity:l.qty,channel,status,
+          tracking_code:sn,staff:'',note:kind==='doi'?'[CHỜ VỀ] Ngoại sàn - đổi hàng':'Ngoại sàn',
+          amount_due:l.price||0,is_paid:kind!=='doi',shipping_fee:0,payment_method:'COD',ship_method:'GHN'});
+        if(rows&&rows[0])allOrders.unshift(rows[0]);
+        if(kind!=='doi'){
+          await postXuat({product_code:l.code,quantity:l.qty,channel,ref_type:'order',ref_id:'NS-'+sn+'#'+(li++),
+            is_kol:kind==='kol',note:`${kind==='kol'?NO_REVENUE_NOTE+' ':''}Ngoại sàn ${kind==='kol'?'KOL':'Khách'} ${sn}`,date:todayStr()});
+        }
+      }
+      if(kind==='kol')doneKol+=items.length;else if(kind==='doi')doneDoi+=items.length;else doneKhach+=items.length;
+    }
+    const parts=[];if(doneKhach)parts.push(`${doneKhach} dòng Khách (trừ kho)`);if(doneKol)parts.push(`${doneKol} dòng KOL (trừ kho)`);if(doneDoi)parts.push(`${doneDoi} dòng Đổi hàng (chờ hàng về)`);
+    toast('✅ '+(parts.join(' · ')||'Đã xử lý'));
+    ghnLines=[];document.getElementById('ng-file').value='';document.getElementById('ng-preview').innerHTML='';document.getElementById('ng-summary').innerHTML='';
+    renderAll();
+  }catch(e){toast('Lỗi: '+e.message,true);}
+  showLoad(false);
+}
+
 /* ══════════ INIT ══════════ */
+
+/* ═══════════ QR CODE SẢN PHẨM ═══════════ */
+function renderQR(prods, newCode){
+  const grid=document.getElementById('qr-grid'); if(!grid) return;
+  const stock=computeStock();
+  grid.innerHTML='';
+  (prods||[]).forEach((p,i)=>{
+    const card=document.createElement('div');
+    card.className='qr-card'+(p.code===newCode?' is-new':'');
+    card.innerHTML=`
+      <button class="qr-delete" onclick="deleteProductAsk('${p.code}','${jsq(p.name)}')" title="Xoá sản phẩm">✕</button>
+      ${p.code===newCode?'<div style="position:absolute;top:8px;right:8px;background:var(--blue-bg);color:var(--blue-fg);font-size:9px;font-weight:700;padding:2px 7px;border-radius:6px">Mới</div>':''}
+      ${p.image_url?`<img src="${normalizeImageUrl(p.image_url)}" alt="${escapeHtml(p.name||'Sản phẩm')}" style="width:100%;height:90px;object-fit:cover;border-radius:8px;margin-bottom:6px;border:1px solid var(--border)" onerror="this.style.display='none'">`:''}
+      <div class="qr-box" id="qb-${i}"></div>
+      <div class="qr-code-label">${p.code}</div>
+      <div class="qr-name">${escapeHtml(p.name)}</div>
+      <div class="qr-detail">${escapeHtml(p.color||'')} · Size ${escapeHtml(p.size||'')}</div>
+      <div style="margin-top:6px"><span class="pill" style="background:${(stock[p.code]||0)<=0?'var(--red-bg)':(stock[p.code]||0)<=5?'#FFF3DC':'var(--grn-bg)'};color:${(stock[p.code]||0)<=0?'var(--red-fg)':(stock[p.code]||0)<=5?'var(--org-fg)':'var(--grn-fg)'}">Tồn: ${stock[p.code]||0}</span></div>
+      <button onclick="editImage('${p.code}')" style="margin-top:6px;width:100%;padding:5px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--brown);font-size:10.5px;cursor:pointer">${p.image_url?'✏️ Sửa ảnh':'📷 Thêm ảnh'}</button>
+      <button onclick="printOneQR('${p.code}','${jsq(p.name)}','${jsq(p.color||'')}','${jsq(p.size||'')}')" style="margin-top:6px;width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--brown);font-size:11px;cursor:pointer">🖨 In QR này</button>`;
+    grid.appendChild(card);
+    setTimeout(()=>{
+      const box=document.getElementById(`qb-${i}`); if(!box) return;
+      try{ new QRCode(box,{text:p.code,width:110,height:110,colorDark:'#3E2723',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.L}); }
+      catch(e){ box.innerHTML=`<div style="font-size:10px;color:var(--brown);text-align:center;padding:10px">${p.code}</div>`; }
+    }, i*40);
+  });
+  if(!prods||!prods.length) grid.innerHTML='<div class="dim" style="padding:20px">Chưa có sản phẩm nào.</div>';
+}
+async function addNewProduct(){
+  const name=document.getElementById('np-name').value.trim();
+  const color=document.getElementById('np-color').value.trim();
+  const size=document.getElementById('np-size').value;
+  const stock=intv(document.getElementById('np-stock').value,0);
+  if(!name||!color){toast('Vui lòng điền tên và màu sắc',true);return;}
+  const maxCode=allProducts.reduce((m,p)=>Math.max(m,parseInt(String(p.code).replace(/[^\d]/g,''))||0),0);
+  const code=`P${String(maxCode+1).padStart(3,'0')}`;
+  showLoad(true);
+  try{
+    const npImg=document.getElementById('np-image').value.trim();
+    const rows=await POST('products',{code,name,color,size,stock_initial:stock,threshold:5,image_url:normalizeImageUrl(npImg)});
+    if(rows&&rows[0])allProducts.push(rows[0]); else allProducts.push({code,name,color,size,stock_initial:stock,threshold:5,image_url:normalizeImageUrl(npImg)});
+    if(stock>0){await postNhap({product_code:code,quantity:stock,channel:'Tồn đầu kỳ',ref_type:'init',ref_id:'init-'+code,note:'Tồn kho ban đầu khi thêm sản phẩm'});}
+    renderQR(allProducts,code);
+    ['np-name','np-color','np-image'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('np-stock').value='0';
+    toast(`Đã thêm ${code} · ${name} · QR sinh xong`);
+    setTimeout(()=>document.querySelector('.qr-card.is-new')?.scrollIntoView({behavior:'smooth',block:'center'}),400);
+  }catch(e){toast('Lỗi: '+e.message,true);}
+  showLoad(false);
+}
+function printOneQR(code,name,color,size){
+  const tmp=document.createElement('div');
+  tmp.style.cssText='position:fixed;left:-9999px;top:-9999px;width:200px;height:200px;background:#fff';
+  document.body.appendChild(tmp);
+  try{
+    new QRCode(tmp,{text:code,width:200,height:200,colorDark:'#3E2723',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.L});
+    setTimeout(()=>{
+      const canvas=tmp.querySelector('canvas'),img=tmp.querySelector('img');
+      let src=''; if(canvas)src=canvas.toDataURL('image/png'); else if(img)src=img.src;
+      document.body.removeChild(tmp);
+      if(!src){toast('Không lấy được QR, thử lại!',true);return;}
+      const w=window.open('','_blank','width=300,height=400');
+      w.document.write(`<!DOCTYPE html><html><head><title>QR - ${code}</title><style>
+        *{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;background:#f5f5f5;display:flex;flex-direction:column;align-items:center;padding:20px;gap:12px}
+        .label{width:50mm;height:50mm;padding:2.5mm;border:.5px solid #ccc;border-radius:1.5mm;text-align:center;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8mm}
+        .brand{font-size:6.5px;letter-spacing:2px;color:#aaa;text-transform:uppercase}img{width:33mm;height:33mm;display:block}
+        .code{font-size:7px;font-family:monospace;color:#999}.name{font-size:11px;font-weight:700;color:#3E2723;line-height:1.2}.detail{font-size:10px;font-weight:700;color:#3E2723}
+        .print-btn{padding:8px 20px;background:#3E2723;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
+        @media print{.print-btn,.hint{display:none}body{background:#fff;padding:0;margin:0}@page{size:50mm 50mm;margin:0}.label{border:none}}
+      </style></head><body><div class="label"><div class="brand">LàSilk</div><img src="${src}" alt="QR ${code}"><div class="code">${code}</div><div class="name">${name}</div><div class="detail">${color} · Size ${size}</div></div>
+      <button class="print-btn" onclick="window.print()">🖨 In 50×50mm</button></body></html>`);
+      w.document.close();
+    },300);
+  }catch(e){document.body.removeChild(tmp);toast('Lỗi sinh QR: '+e.message,true);}
+}
+async function deleteProductAsk(code,name){
+  if(!confirm(`Xoá sản phẩm ${code} · ${name}?\n\nLưu ý: lịch sử nhập xuất vẫn giữ lại.`))return;
+  showLoad(true);
+  try{
+    await fetch(`${SB_URL}/rest/v1/products?code=eq.${encodeURIComponent(code)}`,{method:'DELETE',headers:H});
+    allProducts=allProducts.filter(p=>p.code!==code);
+    toast(`Đã xoá ${code} · ${name}`);
+    renderQR(allProducts);renderProductsTable();
+  }catch(e){toast('Lỗi xoá: '+e.message,true);}
+  showLoad(false);
+}
+function normalizeImageUrl(url){
+  if(!url)return null; url=url.trim(); if(!url)return null;
+  if(url.includes('drive.google.com')){
+    const m=url.match(/\/file\/d\/([-\w]+)/)||url.match(/[?&]id=([-\w]+)/);
+    if(m)return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1000`;
+  }
+  return url;
+}
+async function editImage(code){
+  const p=allProducts.find(x=>x.code===code); if(!p)return;
+  const newUrl=prompt(`Nhập link ảnh cho ${code} · ${p.name}:\n\nLink hiện tại: ${p.image_url||'Chưa có'}\n\n(Link Google Drive tự chuyển — nhớ để "Bất kỳ ai có link đều xem")`,p.image_url||'');
+  if(newUrl===null)return;
+  const cleanUrl=normalizeImageUrl(newUrl);
+  showLoad(true);
+  try{
+    await PATCH(`products?code=eq.${encodeURIComponent(code)}`,{image_url:cleanUrl});
+    p.image_url=cleanUrl;
+    toast(`Đã cập nhật ảnh cho ${code}`);
+    renderQR(allProducts);renderProductsTable();
+  }catch(e){toast('Lỗi: '+e.message,true);}
+  showLoad(false);
+}
+
+/* ═══════════ DANH MỤC SẢN PHẨM ═══════════ */
+function renderProductsTable(){
+  const box=document.getElementById('products-body'); if(!box)return;
+  box.innerHTML=sortPS(allProducts).map(p=>`
+    <tr>
+      <td>${p.image_url?`<img src="${normalizeImageUrl(p.image_url)}" alt="${escapeHtml(p.name||'Sản phẩm')}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" onerror="this.style.display='none'">`:`<div style="width:40px;height:40px;background:var(--bg);border-radius:6px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px">👗</div>`}</td>
+      <td class="l mono">${p.code}</td>
+      <td class="l" style="font-weight:600">${escapeHtml(p.name)}</td>
+      <td class="l">${escapeHtml(p.color||'—')}</td>
+      <td class="l" style="font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.image_url?escapeHtml(p.image_url):'<span class="dim">—</span>'}</td>
+      <td class="l" style="font-size:11px">${fmtDate(p.created_at)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" onclick="openEditProduct('${p.code}')">✏️</button>
+        <button class="btn btn-sm btn-red" onclick="deleteProductAsk('${p.code}','${jsq(p.name)}')">🗑</button>
+      </td>
+    </tr>`).join('')||'<tr><td colspan="7" class="dim" style="padding:20px">Chưa có sản phẩm.</td></tr>';
+}
+function openAddProduct(){
+  m_title('+ Thêm sản phẩm mới');
+  document.getElementById('m-body').innerHTML=`
+    <input type="hidden" id="p-edit-code">
+    <div class="grid2">
+      <label class="fld"><span>Mã SP *</span><input id="p-code" placeholder="P013"></label>
+      <label class="fld"><span>Tên sản phẩm *</span><input id="p-name" placeholder="Đầm Butterfly"></label>
+    </div>
+    <label class="fld"><span>Màu sắc</span><input id="p-color" placeholder="Đỏ rượu"></label>
+    <label class="fld"><span>Link ảnh sản phẩm (URL)</span><input id="p-image" placeholder="https://..."></label>`;
+  m_foot(`<button class="btn" onclick="closeModal()">Huỷ</button><button class="btn btn-dark" onclick="saveProductModal()">Lưu sản phẩm</button>`);
+  openModal();
+}
+function openEditProduct(code){
+  const p=allProducts.find(x=>x.code===code); if(!p)return;
+  m_title('✏️ Sửa sản phẩm '+code);
+  document.getElementById('m-body').innerHTML=`
+    <input type="hidden" id="p-edit-code2" value="${code}">
+    <div class="grid2">
+      <label class="fld"><span>Mã SP</span><input id="p-code2" value="${code}" disabled style="opacity:.6"></label>
+      <label class="fld"><span>Tên sản phẩm *</span><input id="p-name2" value="${escapeHtml(p.name||'')}"></label>
+    </div>
+    <label class="fld"><span>Màu sắc</span><input id="p-color2" value="${escapeHtml(p.color||'')}"></label>
+    <label class="fld"><span>Link ảnh sản phẩm (URL)</span><input id="p-image2" value="${escapeHtml(p.image_url||'')}"></label>`;
+  m_foot(`<button class="btn" onclick="closeModal()">Huỷ</button><button class="btn btn-dark" onclick="saveProductModal()">Lưu sản phẩm</button>`);
+  openModal();
+}
+async function saveProductModal(){
+  const isEdit=!!document.getElementById('p-edit-code2');
+  const editCode=isEdit?document.getElementById('p-edit-code2').value:'';
+  const code=document.getElementById(isEdit?'p-code2':'p-code').value.trim();
+  const name=document.getElementById(isEdit?'p-name2':'p-name').value.trim();
+  if(!code||!name){toast('Vui lòng điền mã và tên sản phẩm',true);return;}
+  const data={name,color:document.getElementById(isEdit?'p-color2':'p-color').value.trim(),
+    image_url:normalizeImageUrl(document.getElementById(isEdit?'p-image2':'p-image').value)};
+  showLoad(true);
+  try{
+    if(editCode){
+      await PATCH(`products?code=eq.${encodeURIComponent(editCode)}`,data);
+      const p=allProducts.find(x=>x.code===editCode); if(p)Object.assign(p,data);
+      toast(`Đã cập nhật ${editCode}`);
+    }else{
+      if(allProducts.some(p=>p.code===code)){toast('Mã SP đã tồn tại',true);showLoad(false);return;}
+      const rows=await POST('products',{code,...data});
+      if(rows&&rows[0])allProducts.push(rows[0]); else allProducts.push({code,...data});
+      toast(`Đã thêm ${code}`);
+    }
+    closeModal();renderProductsTable();renderQR(allProducts);
+  }catch(e){toast('Lỗi: '+e.message,true);}
+  showLoad(false);
+}
 
 /* ═══════════ TỰ ĐIỀN THÔNG TIN KHÁCH (dán từ Zalo) ═══════════ */
 function autoParse(){
