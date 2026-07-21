@@ -221,8 +221,8 @@ tr:last-child td{border-bottom:none}
 
       <!-- NGOẠI SÀN: GHN hoặc đơn vị vận chuyển ngoài (Khách / KOL / Đổi hàng) -->
       <div id="tao-ngoai" style="display:none">
-        <div class="pg-s">Đơn đi qua đơn vị vận chuyển ngoài (GHN...) không thuộc sàn TMĐT. Tải tem lên rồi <b>chọn loại cho từng đơn</b> — Khách/KOL trừ kho ngay, Đổi hàng đưa vào hàng chờ về (chưa cộng kho).</div>
-        <div class="setup">📥 Tải <b>tem PDF (GHN Express)</b> kéo vào ô dưới — tự đọc tên khách, địa chỉ, SĐT, COD, sản phẩm.</div>
+        <div class="pg-s">Đơn đi qua đơn vị vận chuyển ngoài sàn TMĐT (GHN, SPX/Shopee Express...) — không thuộc đơn Shopee/TikTok sàn thật. Tải tem lên rồi <b>chọn loại cho từng đơn</b> — Khách/KOL trừ kho ngay, Đổi hàng đưa vào hàng chờ về (chưa cộng kho).</div>
+        <div class="setup">📥 Tải <b>tem PDF (GHN Express hoặc SPX/Shopee Express)</b> kéo vào ô dưới — tự nhận diện loại tem, đọc tên khách, địa chỉ, SĐT (nếu có), COD, sản phẩm. Lưu ý: tem SPX ngoại sàn thường không in SĐT khách — bạn có thể bổ sung tay nếu cần.</div>
         <div class="card" style="max-width:680px">
           <label class="fld" style="margin:0"><span>File tem Ngoại sàn (.pdf)</span><input type="file" id="ng-file" accept=".pdf" onchange="ghnParse(this)"></label>
           <div id="ng-summary" style="margin-top:12px"></div>
@@ -2017,7 +2017,7 @@ async function shopeeImport(){
   showLoad(false);
 }
 
-/* ══════════ NGOẠI SÀN (GHN) ══════════ */
+/* ══════════ NGOẠI SÀN (GHN + SPX/Shopee Express) ══════════ */
 let ghnLines=[];
 function ghnOrderCode(full){
   const re=/\b(?=[A-Z0-9]{6,10}\b)(?=[A-Z0-9]*[A-Z])(?=[A-Z0-9]*\d)[A-Z0-9]{6,10}\b/g;
@@ -2053,6 +2053,40 @@ function ghnParsePage(full){
   }
   return{order_code,name,phone,addr,cod,tag,items};
 }
+/* ── Đọc tem SPX (Shopee Express) dùng riêng cho đơn NGOẠI SÀN
+   — khác tem GHN: layout 2 cột "Từ:" / "Đến:" nằm cạnh nhau, không
+   có dòng "Bên nhận" như GHN, và KHÔNG có "Mã đơn hàng" (đó là dấu
+   hiệu để phân biệt với tem Shopee sàn thật ở tab Đơn Sàn). ── */
+function spxOffRecipient(rows){
+  let di=-1,xDen=null;
+  outer: for(let i=0;i<rows.length;i++){for(const it of rows[i].items){if(shvNorm(it.s).trim()==='den'){di=i;xDen=it.x;break outer;}}}
+  if(di<0)return null;
+  const out=[];
+  for(let i=di+1;i<rows.length&&out.length<8;i++){
+    const rowText=rows[i].items.map(it=>it.s).join(' ');
+    const rn=shvNorm(rowText);
+    if(rn.includes('noi dung hang')||rn.includes('sdt')||rn.includes('chi dan giao hang')||rn.includes('ngay tao van don'))break;
+    const line=rows[i].items.filter(it=>it.x>=xDen-6).map(it=>it.s).join(' ').replace(/\s+/g,' ').trim();
+    if(line)out.push(line);
+  }
+  return {name:out[0]||'',addr:out.slice(1).join(', ')};
+}
+function spxOffParsePage(rows,full){
+  const fn=shvNorm(full);
+  if(!fn.includes('ma van don'))return null; // không phải tem SPX
+  if(fn.includes('ma don hang'))return null; // có "Mã đơn hàng" → tem Shopee sàn thật, để tab Đơn Sàn xử lý
+  let order_code=(full.match(/[Mm][ãa]\s*v[ậa]n\s*đ[ơo]n[:\s]*\s*(SPX[A-Z0-9]{6,})/i)||[])[1]||'';
+  if(!order_code)order_code=(full.match(/\b(SPX[A-Z0-9]{6,})\b/i)||[])[1]||''; // rơi về tìm mã SPX bất kỳ trong tem nếu label bị tách chữ khác thường
+  if(!order_code)return null;
+  const rcv=spxOffRecipient(rows)||{name:'',addr:''};
+  const cod=parseInt(((full.match(/Ti[eề]n\s*thu\s*[Nn]g[ưu][ờo]i\s*nh[ậa]n:?\s*([\d.,]+)/i)||[])[1]||'0').replace(/[^\d]/g,''))||0;
+  const items=[];
+  const re=/\d+\.\s*(.+?)\s*SIZE:\s*([^,]+),\s*SL:\s*(\d+)/gi;
+  let m;
+  while((m=re.exec(full))){items.push({prod:m[1].trim(),variation:m[2].trim(),qty:parseInt(m[3])||1});}
+  if(!items.length)return null;
+  return{order_code,name:rcv.name,phone:'',addr:rcv.addr,cod,tag:'',items};
+}
 async function ghnParse(input){
   const file=input.files&&input.files[0]; if(!file)return;
   const sum=document.getElementById('ng-summary');sum.innerHTML='<div class="setup">Đang đọc tem PDF…</div>';
@@ -2061,11 +2095,13 @@ async function ghnParse(input){
     const buf=await file.arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:buf}).promise;
     ghnLines=[];
+    const debugPages=[];
     for(let i=1;i<=pdf.numPages;i++){
       const tc=await (await pdf.getPage(i)).getTextContent();
       const rows=shpPageRows(tc.items);
       const full=rows.map(r=>r.items.map(it=>it.s).join(' ')).join('\n');
-      const g=ghnParsePage(full);
+      debugPages.push(full);
+      const g=ghnParsePage(full)||spxOffParsePage(rows,full);
       if(!g||!g.items.length)continue;
       g.items.forEach((it,idx)=>{
         const line={sn:g.order_code,buyer:g.name,phone:g.phone,addr:g.addr,tag:g.tag,
@@ -2075,7 +2111,13 @@ async function ghnParse(input){
         ghnLines.push(line);
       });
     }
-    if(!ghnLines.length){sum.innerHTML='<div class="setup" style="background:var(--red-bg);color:var(--red-fg)">Không đọc được đơn nào từ PDF. Kiểm tra đúng file tem GHN.</div>';return;}
+    if(!ghnLines.length){
+      const dbg=escapeHtml(debugPages.join('\n\n────── (trang kế) ──────\n\n'));
+      sum.innerHTML='<div class="setup" style="background:var(--red-bg);color:var(--red-fg)">Không đọc được đơn nào từ PDF. Kiểm tra đúng file tem GHN hoặc SPX (Shopee Express).<br><br>'
+        +'<b>Chữ thô đọc được từ PDF (bấm chọn hết rồi copy gửi lại nếu cần hỗ trợ):</b>'
+        +'<textarea readonly onclick="this.select()" style="width:100%;margin-top:8px;height:220px;font-family:monospace;font-size:11px;padding:8px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--dark)">'+dbg+'</textarea></div>';
+      return;
+    }
     renderGhnPreview();
   }catch(e){sum.innerHTML='<div class="setup" style="background:var(--red-bg);color:var(--red-fg)">Lỗi đọc PDF: '+escapeHtml(e.message)+'</div>';}
 }
